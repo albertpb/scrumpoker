@@ -1,4 +1,4 @@
-package main
+package httpapi
 
 import (
 	"context"
@@ -8,12 +8,6 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 )
-
-type serverMessage struct {
-	Type    string     `json:"type"`
-	Room    *roomState `json:"room,omitempty"`
-	Message string     `json:"message,omitempty"`
-}
 
 type client struct {
 	roomCode      string
