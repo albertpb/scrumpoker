@@ -3,6 +3,6 @@ backend/poker.db-shm
 backend/poker.db-wal
 frontend/node_modules/
 frontend/dist/
-.env
 *.log
 *.exe
+*.env
