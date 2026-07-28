@@ -23,8 +23,7 @@ services:
     pull_policy: always                                                                                                                   
     restart: unless-stopped                                                                                                               
     environment:                                                                                                                          
-      VITE_WS_URL: ws://scrumpoker.api.albertpb.cl                                                                                        
-      BACKEND_URL: http://backend:8080                                                                                                    
+      VITE_WS_URL: wss://planning.api.albertpb.cl                                                                                        
     ports:                                                                                                                                
       - "${FRONTEND_PORT:-3000}:8080"                                                                                                     
     depends_on:                                                                                                                           

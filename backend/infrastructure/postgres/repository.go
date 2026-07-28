@@ -7,8 +7,9 @@ import (
 	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/stdlib"
 
 	"scrumpoker/backend/domain"
 )
@@ -18,10 +19,11 @@ type Repository struct {
 }
 
 func Open(connectionURL string) (*Repository, error) {
-	db, err := sql.Open("pgx", connectionURL)
+	config, err := connectionConfig(connectionURL)
 	if err != nil {
 		return nil, err
 	}
+	db := stdlib.OpenDB(*config)
 
 	repository := &Repository{db: db}
 	if err := repository.migrate(); err != nil {
@@ -29,6 +31,18 @@ func Open(connectionURL string) (*Repository, error) {
 		return nil, err
 	}
 	return repository, nil
+}
+
+func connectionConfig(connectionURL string) (*pgx.ConnConfig, error) {
+	config, err := pgx.ParseConfig(connectionURL)
+	if err != nil {
+		return nil, err
+	}
+
+	// Transaction poolers can move each query to a different server connection,
+	// so connection-local named prepared statements are not safe to cache.
+	config.DefaultQueryExecMode = pgx.QueryExecModeExec
+	return config, nil
 }
 
 func (r *Repository) Close() error { return r.db.Close() }
