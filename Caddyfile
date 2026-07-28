@@ -1,0 +1,7 @@
+poker.albertpb.cl {
+        reverse_proxy frontend:8080
+}
+
+poker.api.albertpb.cl {
+        reverse_proxy backend:8080
+}

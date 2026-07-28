@@ -1,0 +1,57 @@
+name: scrumpoker                                                                                                                          
+                                                                                                                                          
+services:                                                                                                                                 
+  backend:                                                                                                                                
+    image: ghcr.io/albertpb/scrumpoker-backend:latest                                                                                     
+    pull_policy: always                                                                                                                   
+    restart: unless-stopped                                                                                                               
+    environment:                                                                                                                          
+      ADDR: ":8080"                                                                                                                       
+      DATABASE_DRIVER: postgres                                                                                                           
+      DATABASE_URL:         
+    ports:                                                                                                                                
+      - "${BACKEND_PORT:-8080}:8080"                                                                                                      
+    healthcheck:                                                                                                                          
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/api/health"]                                                         
+      interval: 10s                                                                                                                       
+      timeout: 3s                                                                                                                         
+      retries: 5                                                                                                                          
+      start_period: 5s                                                                                                                    
+                                                                                                                                          
+  frontend:                                                                                                                               
+    image: ghcr.io/albertpb/scrumpoker-frontend:latest                                                                                    
+    pull_policy: always                                                                                                                   
+    restart: unless-stopped                                                                                                               
+    environment:                                                                                                                          
+      VITE_WS_URL: ws://scrumpoker.api.albertpb.cl                                                                                        
+      BACKEND_URL: http://backend:8080                                                                                                    
+    ports:                                                                                                                                
+      - "${FRONTEND_PORT:-3000}:8080"                                                                                                     
+    depends_on:                                                                                                                           
+      backend:                                                                                                                            
+        condition: service_healthy                                                                                                        
+    healthcheck:                                                                                                                          
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]                                                                   
+      interval: 10s                                                                                                                       
+      timeout: 3s                                                                                                                         
+      retries: 5                                                                                                                          
+      start_period: 5s                                                                                                                    
+                                                                                                                                          
+                                                                                                                                          
+  caddy:                                                                                                                                  
+    image: caddy:2                                                                                                                        
+    ports:                                                                                                                                
+      - "80:80"                                                                                                                           
+      - "443:443"                                                                                                                         
+    volumes:                                                                                                                              
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro                                                                                               
+      - caddy_data:/data                                                                                                                  
+      - caddy_config:/config                                                                                                              
+    depends_on:                                                                                                                           
+      - frontend                                                                                                                          
+      - backend                                                                                                                           
+                                                                                                                                          
+volumes:                                                                                                                                  
+  caddy_data:                                                                                                                             
+  caddy_config:                                                                                                                           
+                                                                                                                                          
