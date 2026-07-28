@@ -106,6 +106,12 @@ The frontend supports one optional build-time variable:
 | --- | --- | --- |
 | `VITE_WS_URL` | inferred | WebSocket base URL, such as `wss://api.example.com` |
 
+The frontend container supports one runtime variable:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `BACKEND_URL` | `http://backend:8080` | Internal backend URL used by Nginx for `/api` and `/ws` proxying |
+
 ## Database Configuration
 
 ### SQLite
@@ -158,6 +164,112 @@ FRONTEND_DIR=../frontend/dist
 Then start the backend from `backend/` and open `http://localhost:8080`.
 
 For a separate frontend deployment, configure its hosting platform to proxy `/api` to the backend and set `VITE_WS_URL` before building.
+
+## Docker
+
+### Backend image
+
+The backend image contains only the API and WebSocket server. Build it from the repository root:
+
+```bash
+docker build -t scrumpoker-backend ./backend
+```
+
+Run it with SQLite and a persistent volume:
+
+```bash
+docker run --rm -p 8080:8080 \
+  -v scrumpoker-data:/data \
+  scrumpoker-backend
+```
+
+Run it with PostgreSQL or Supabase:
+
+```bash
+docker run --rm -p 8080:8080 \
+  -e DATABASE_DRIVER=postgres \
+  -e "DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/postgres?sslmode=require" \
+  scrumpoker-backend
+```
+
+Alternatively, pass the backend environment file:
+
+```bash
+docker run --rm -p 8080:8080 --env-file backend/.env scrumpoker-backend
+```
+
+The container runs as a non-root user, exposes port `8080`, and has an HTTP health check at `/api/health`. Do not bake `.env` or credentials into the image.
+
+### Frontend image
+
+The frontend image builds the Vite application and serves it from unprivileged Nginx on port `8080`:
+
+```bash
+docker build -t scrumpoker-frontend ./frontend
+```
+
+At runtime, `BACKEND_URL` tells Nginx where to proxy `/api` and `/ws`. The URL is resolved inside the frontend container and is not a browser-facing URL.
+
+```bash
+docker run --rm -p 3000:8080 \
+  -e BACKEND_URL=http://host.docker.internal:8080 \
+  scrumpoker-frontend
+```
+
+Open `http://localhost:3000`. On Linux, use the backend container's network name or add an appropriate host mapping instead of `host.docker.internal`.
+
+To run both images on one Docker network with SQLite:
+
+```bash
+docker network create scrumpoker
+
+docker run -d --name backend --network scrumpoker \
+  -v scrumpoker-data:/data \
+  scrumpoker-backend
+
+docker run --rm --name frontend --network scrumpoker \
+  -p 3000:8080 \
+  -e BACKEND_URL=http://backend:8080 \
+  scrumpoker-frontend
+```
+
+The frontend container provides SPA route fallback, long-lived caching for hashed assets, API proxying, WebSocket upgrades, and a container health check. `VITE_WS_URL` remains available as an optional Docker build argument when the browser must connect directly to a different WebSocket endpoint:
+
+```bash
+docker build \
+  --build-arg VITE_WS_URL=wss://api.example.com \
+  -t scrumpoker-frontend ./frontend
+```
+
+## GitHub Container Registry
+
+The backend and frontend workflows test their applications and build `linux/amd64` and `linux/arm64` images:
+
+```text
+.github/workflows/backend-image.yml
+.github/workflows/frontend-image.yml
+```
+
+- Pull requests build and test the image without publishing it.
+- Pushes to `main` publish `main`, `sha-*`, and `latest` tags.
+- Git tags such as `v1.2.3` publish `1.2.3`, `1.2`, and `sha-*` tags.
+- Manual workflow runs publish tags generated from the selected ref.
+
+The image names are generated in lowercase as:
+
+```text
+ghcr.io/OWNER/REPOSITORY-backend:TAG
+ghcr.io/OWNER/REPOSITORY-frontend:TAG
+```
+
+For example:
+
+```bash
+docker pull ghcr.io/example/scrumpoker-backend:latest
+docker pull ghcr.io/example/scrumpoker-frontend:latest
+```
+
+The workflow authenticates with the built-in `GITHUB_TOKEN`; no registry password secret is required. The repository workflow permission must allow package writes. After the first publication, set the package visibility to public in the package settings if anonymous pulls are required.
 
 ## API
 
